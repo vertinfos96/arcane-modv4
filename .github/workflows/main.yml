@@ -3,21 +3,38 @@ on: [push, workflow_dispatch]
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: arcane-mod
     steps:
       - uses: actions/checkout@v4
+
+      - name: Find project folder
+        id: find
+        run: |
+          f=$(find . -name gradlew -not -path './.git/*' | head -n 1)
+          if [ -z "$f" ]; then
+            echo "gradlew NOT FOUND. Repository files:"
+            find . -maxdepth 3 -not -path './.git*' | head -n 100
+            exit 1
+          fi
+          dir=$(dirname "$f")
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          echo "Project folder: $dir"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
+
       - uses: gradle/actions/setup-gradle@v4
         with:
-          build-root-directory: arcane-mod
-      - run: chmod +x gradlew
-      - run: ./gradlew build
+          build-root-directory: ${{ steps.find.outputs.dir }}
+
+      - name: Build
+        working-directory: ${{ steps.find.outputs.dir }}
+        run: |
+          chmod +x gradlew
+          ./gradlew build
+
       - uses: actions/upload-artifact@v4
         with:
           name: arcane-staff-mod
-          path: arcane-mod/build/libs/*.jar
+          path: ${{ steps.find.outputs.dir }}/build/libs/*.jar
